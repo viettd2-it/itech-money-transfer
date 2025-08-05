@@ -1,0 +1,33 @@
+spring:
+  redis:
+    host: localhost
+    port: 6379
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+        max-wait: -1ms
+
+redis:
+  pubsub:
+    channel: flipt:flags:update
+    enabled: true
+
+websocket:
+  enabled: true
+
+server:
+  port: 8282
+
+feature-flag:
+  flipt-url: http://localhost:8080
+  # Single token for backward compatibility (will be used for 'bep' namespace)
+  namespace-token: wDR3bzX6SQ7iMFE_IpdzsWCVd3ft9-CHvp1Ep7o5NGI=
+  # Multiple namespace tokens
+  namespace-tokens:
+    bep: wDR3bzX6SQ7iMFE_IpdzsWCVd3ft9-CHvp1Ep7o5NGI=
+    rdb: your-rdb-token-here
+    default: your-default-token-here
+    # Add more namespaces as needed

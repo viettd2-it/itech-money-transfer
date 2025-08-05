@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Flag Updates Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .connecting { background-color: #fff3cd; color: #856404; }
+        
+        .message {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+            background-color: #f8f9fa;
+        }
+        
+        .message.flag_update { border-left-color: #28a745; }
+        .message.connection_status { border-left-color: #17a2b8; }
+        .message.error { border-left-color: #dc3545; }
+        
+        .controls {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+        }
+        
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+        }
+        
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        
+        input, select {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+        }
+        
+        .namespace-selector {
+            margin: 10px 0;
+        }
+        
+        #messageLog {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            background-color: #f8f9fa;
+        }
+        
+        .timestamp {
+            color: #6c757d;
+            font-size: 0.8em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WebSocket Flag Updates Test</h1>
+        
+        <div id="status" class="status disconnected">Disconnected</div>
+        
+        <div class="controls">
+            <button id="connectBtn" onclick="connect()">Connect</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+            <button id="clearBtn" onclick="clearMessages()">Clear Messages</button>
+            
+            <div class="namespace-selector">
+                <label for="namespaceSelect">Subscribe to namespace:</label>
+                <select id="namespaceSelect">
+                    <option value="">All namespaces</option>
+                    <option value="bep">BEP</option>
+                    <option value="rdb">RDB</option>
+                    <option value="default">Default</option>
+                </select>
+                <button onclick="subscribeToNamespace()">Subscribe</button>
+            </div>
+        </div>
+        
+        <div>
+            <h3>Message Log</h3>
+            <div id="messageLog"></div>
+        </div>
+    </div>
+
+    <script>
+        let stompClient = null;
+        let connected = false;
+        
+        function connect() {
+            const socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            
+            updateStatus('connecting', 'Connecting...');
+            
+            stompClient.connect({}, function (frame) {
+                connected = true;
+                updateStatus('connected', 'Connected to WebSocket');
+                
+                // Subscribe to general flag updates
+                stompClient.subscribe('/topic/flags', function (message) {
+                    displayMessage(JSON.parse(message.body));
+                });
+                
+                // Subscribe to system messages
+                stompClient.subscribe('/topic/system', function (message) {
+                    displayMessage(JSON.parse(message.body));
+                });
+                
+                // Subscribe to user-specific messages
+                stompClient.subscribe('/user/queue/messages', function (message) {
+                    displayMessage(JSON.parse(message.body));
+                });
+                
+                // Subscribe to subscription responses
+                stompClient.subscribe('/user/queue/subscription', function (message) {
+                    displayMessage(JSON.parse(message.body));
+                });
+                
+                // Subscribe to pong responses
+                stompClient.subscribe('/user/queue/pong', function (message) {
+                    displayMessage(JSON.parse(message.body));
+                });
+                
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+                
+                addMessage('System', 'Connected to WebSocket server', 'connection_status');
+                
+            }, function (error) {
+                connected = false;
+                updateStatus('disconnected', 'Connection failed: ' + error);
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+            });
+        }
+        
+        function disconnect() {
+            if (stompClient !== null) {
+                stompClient.disconnect();
+                connected = false;
+                updateStatus('disconnected', 'Disconnected');
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+                addMessage('System', 'Disconnected from WebSocket server', 'connection_status');
+            }
+        }
+        
+        function subscribeToNamespace() {
+            if (!connected) {
+                alert('Please connect first');
+                return;
+            }
+            
+            const namespace = document.getElementById('namespaceSelect').value;
+            const payload = namespace ? { namespace: namespace } : {};
+            
+            stompClient.send("/app/subscribe", {}, JSON.stringify(payload));
+        }
+        
+        function updateStatus(className, text) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = 'status ' + className;
+            statusDiv.textContent = text;
+        }
+        
+        function displayMessage(message) {
+            const type = message.type || 'unknown';
+            const content = formatMessage(message);
+            addMessage(type, content, type);
+        }
+        
+        function formatMessage(message) {
+            let content = '';
+            
+            switch (message.type) {
+                case 'flag_update':
+                    content = `Flag Update: ${message.action} - Namespace: ${message.namespace}, Flag: ${message.flagKey}, Enabled: ${message.enabled}`;
+                    break;
+                case 'connection_status':
+                    content = `Status: ${message.message}`;
+                    break;
+                case 'error':
+                    content = `Error: ${message.message}`;
+                    break;
+                default:
+                    content = JSON.stringify(message, null, 2);
+            }
+            
+            return content;
+        }
+        
+        function addMessage(type, content, messageType) {
+            const messageLog = document.getElementById('messageLog');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ' + messageType;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            messageDiv.innerHTML = `
+                <div class="timestamp">${timestamp}</div>
+                <strong>${type}:</strong> ${content}
+            `;
+            
+            messageLog.appendChild(messageDiv);
+            messageLog.scrollTop = messageLog.scrollHeight;
+        }
+        
+        function clearMessages() {
+            document.getElementById('messageLog').innerHTML = '';
+        }
+        
+        // Auto-connect on page load
+        window.onload = function() {
+            setTimeout(connect, 1000);
+        };
+    </script>
+</body>
+</html> 
