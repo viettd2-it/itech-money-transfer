@@ -24,9 +24,9 @@ public class TransferService {
 //  @FeatureFlag(key = "transfer-international", namespace = "bep")
   public String transferInternational(TransferRequest transferRequest) {
     boolean test = featureFlagService.isEnabled("bep", "bep-ff-1", transferRequest.getUserId());
-    log.info("test: " + test);
+    log.info("test: {}", test);
     List<FlagResponse> flagResponses = featureFlagService.getFlagsByNamespace("bep");
-    log.info("flagResponses: " + flagResponses);
+    log.info("flagResponses: {}", flagResponses);
     return "Transferred " + transferRequest.getAmount();
   }
 }

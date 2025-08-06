@@ -1,7 +1,7 @@
 package ibank.tech.money.transfer.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import ibank.tech.money.transfer.dto.FliptFlagUpdateEvent;
+import ibank.tech.money.transfer.dto.FliptGenericUpdateEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -21,23 +21,33 @@ public class WebSocketBroadcastService {
     private final ObjectMapper objectMapper;
 
     /**
-     * Broadcast flag update to all connected WebSocket clients
+     * Broadcast Flipt update to all connected WebSocket clients
      */
-    public void broadcastFlagUpdate(FliptFlagUpdateEvent event) {
+    public void broadcastUpdate(FliptGenericUpdateEvent event) {
         try {
-            String namespace = getNamespace(event);
-            
-            // Broadcast to all clients subscribed to /topic/flags
-            messagingTemplate.convertAndSend("/topic/flags", event);
-            
+            log.info("=== WEBSOCKET BROADCAST SERVICE CALLED ===");
+            log.info("Event type: {}, namespace: {}, action: {}", event.getType(), event.getNamespace(), event.getAction());
+
+            String namespace = event.getNamespace();
+            String entityType = getEntityTypeFromEvent(event);
+
+            log.info("Determined entity type: {}", entityType);
+            log.info("Broadcasting to topics: /topic/{} and /topic/{}/{}", entityType, entityType, namespace);
+
+            // Broadcast to all clients subscribed to /topic/{entityType}
+            messagingTemplate.convertAndSend("/topic/" + entityType, event);
+            log.info("Sent to /topic/{}", entityType);
+
             // Broadcast to namespace-specific topic
-            messagingTemplate.convertAndSend("/topic/flags/" + namespace, event);
-            
-            log.info("Broadcasted flag update to WebSocket clients: namespace={}, action={}", 
-                    namespace, getAction(event));
-                    
+            messagingTemplate.convertAndSend("/topic/" + entityType + "/" + namespace, event);
+            log.info("Sent to /topic/{}/{}", entityType, namespace);
+
+            log.info("=== WEBSOCKET BROADCAST COMPLETED ===");
+            log.info("Broadcasted {} update to WebSocket clients: namespace={}, action={}",
+                    entityType, namespace, event.getAction());
+
         } catch (Exception e) {
-            log.error("Error broadcasting flag update via WebSocket", e);
+            log.error("Error broadcasting update via WebSocket", e);
         }
     }
 
@@ -65,17 +75,17 @@ public class WebSocketBroadcastService {
         }
     }
 
-    private String getNamespace(FliptFlagUpdateEvent event) {
-        if (event != null && event.getData() != null && event.getData().getNamespace() != null) {
-            return event.getData().getNamespace();
-        }
-        return "default";
-    }
-
-    private String getAction(FliptFlagUpdateEvent event) {
-        if (event != null && event.getData() != null && event.getData().getAction() != null) {
-            return event.getData().getAction();
-        }
+    /**
+     * Extract entity type from event type field
+     */
+    private String getEntityTypeFromEvent(FliptGenericUpdateEvent event) {
+        String type = event.getType();
+        if (type == null) return "unknown";
+        
+        if (type.startsWith("flag.")) return "flags";
+        if (type.startsWith("segment.")) return "segments";
+        if (type.startsWith("constraint.")) return "constraints";
+        
         return "unknown";
     }
 }

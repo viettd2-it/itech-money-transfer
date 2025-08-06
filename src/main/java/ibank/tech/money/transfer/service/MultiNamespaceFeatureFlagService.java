@@ -86,8 +86,9 @@ public class MultiNamespaceFeatureFlagService {
                 return token;
             }
         }
-        // For 'bep' namespace, also check the default token (backward compatibility)
-        if ("bep".equals(namespace) && defaultToken != null && !defaultToken.trim().isEmpty()) {
+        // Fallback to default token for any namespace (backward compatibility)
+        if (defaultToken != null && !defaultToken.trim().isEmpty()) {
+            log.debug("Using default token for namespace: {}", namespace);
             return defaultToken;
         }
         return null;

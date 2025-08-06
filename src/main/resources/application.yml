@@ -12,8 +12,8 @@ spring:
 
 redis:
   pubsub:
-    channel: flipt:flags:update
     enabled: true
+    channels: "flipt:flags:update,flipt:segments:update,flipt:constraints:update"
 
 websocket:
   enabled: true
