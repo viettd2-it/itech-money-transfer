@@ -3,100 +3,183 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebSocket Flag Updates Test</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <title>Flipt WebSocket Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
+            margin: 0;
             padding: 20px;
             background-color: #f5f5f5;
         }
+        
         .container {
-            background: white;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
         .status {
             padding: 10px;
-            margin: 10px 0;
             border-radius: 4px;
+            margin-bottom: 20px;
             font-weight: bold;
-        }
-        .connected { background-color: #d4edda; color: #155724; }
-        .disconnected { background-color: #f8d7da; color: #721c24; }
-        .connecting { background-color: #fff3cd; color: #856404; }
-        
-        .message {
-            padding: 10px;
-            margin: 5px 0;
-            border-radius: 4px;
-            border-left: 4px solid #007bff;
-            background-color: #f8f9fa;
+            text-align: center;
         }
         
-        .message.flag_update { border-left-color: #28a745; }
-        .message.connection_status { border-left-color: #17a2b8; }
-        .message.error { border-left-color: #dc3545; }
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.connecting {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
         
         .controls {
-            margin: 20px 0;
-            padding: 15px;
-            background-color: #e9ecef;
-            border-radius: 4px;
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
         }
         
         button {
-            padding: 8px 16px;
-            margin: 5px;
+            padding: 10px 20px;
             border: none;
             border-radius: 4px;
             cursor: pointer;
+            font-size: 14px;
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .btn-primary {
             background-color: #007bff;
             color: white;
         }
         
-        button:hover { background-color: #0056b3; }
-        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
         
-        input, select {
-            padding: 8px;
-            margin: 5px;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
         }
         
         .namespace-selector {
-            margin: 10px 0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-left: auto;
         }
         
-        #messageLog {
-            max-height: 400px;
+        select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .message-log {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            height: 400px;
             overflow-y: auto;
-            border: 1px solid #dee2e6;
             padding: 10px;
             background-color: #f8f9fa;
+        }
+        
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .message.flag\.update {
+            border-left-color: #28a745;
+            background-color: #d4edda;
+        }
+        
+        .message.segment\.update {
+            border-left-color: #ffc107;
+            background-color: #fff3cd;
+        }
+        
+        .message.constraint\.update {
+            border-left-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        
+        .message.connection_status {
+            border-left-color: #17a2b8;
+            background-color: #d1ecf1;
+        }
+        
+        .message.error {
+            border-left-color: #dc3545;
+            background-color: #f8d7da;
         }
         
         .timestamp {
             color: #6c757d;
             font-size: 0.8em;
+            margin-bottom: 4px;
+        }
+        
+        .debug-info {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+        }
+        
+        .debug-info h4 {
+            margin-top: 0;
+            color: #495057;
+        }
+        
+        .debug-info p {
+            margin: 5px 0;
+            font-family: monospace;
+            font-size: 12px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>WebSocket Flag Updates Test</h1>
+        <h1>🚀 Flipt WebSocket Real-Time Updates Test</h1>
         
         <div id="status" class="status disconnected">Disconnected</div>
         
         <div class="controls">
-            <button id="connectBtn" onclick="connect()">Connect</button>
-            <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
-            <button id="clearBtn" onclick="clearMessages()">Clear Messages</button>
+            <button id="connectBtn" class="btn-primary" onclick="connect()">Connect</button>
+            <button id="disconnectBtn" class="btn-danger" onclick="disconnect()" disabled>Disconnect</button>
+            <button class="btn-secondary" onclick="clearMessages()">Clear Messages</button>
             
             <div class="namespace-selector">
                 <label for="namespaceSelect">Subscribe to namespace:</label>
@@ -106,54 +189,53 @@
                     <option value="rdb">RDB</option>
                     <option value="default">Default</option>
                 </select>
-                <button onclick="subscribeToNamespace()">Subscribe</button>
+                <button class="btn-primary" onclick="subscribeToNamespace()">Subscribe</button>
             </div>
         </div>
         
         <div>
-            <h3>Message Log</h3>
-            <div id="messageLog"></div>
+            <h3>📨 Real-Time Message Log</h3>
+            <div id="messageLog" class="message-log"></div>
+        </div>
+        
+        <div class="debug-info">
+            <h4>🔧 Debug Information</h4>
+            <p><strong>WebSocket URL:</strong> ws://localhost:8282/ws</p>
+            <p><strong>Subscribed Topics:</strong></p>
+            <ul id="subscribedTopics">
+                <li>/topic/flags (All flag updates)</li>
+                <li>/topic/segments (All segment updates)</li>
+                <li>/topic/constraints (All constraint updates)</li>
+            </ul>
+            <p><strong>Expected Message Types:</strong> flag.update, segment.update, constraint.update</p>
+            <p><strong>Console:</strong> Open browser developer tools (F12) to see detailed debug logs</p>
         </div>
     </div>
 
     <script>
         let stompClient = null;
         let connected = false;
+        let subscriptions = [];
         
         function connect() {
             const socket = new SockJS('/ws');
             stompClient = Stomp.over(socket);
+            
+            // Enable debug logging
+            stompClient.debug = function(str) {
+                console.log('STOMP Debug:', str);
+            };
             
             updateStatus('connecting', 'Connecting...');
             
             stompClient.connect({}, function (frame) {
                 connected = true;
                 updateStatus('connected', 'Connected to WebSocket');
+                console.log('=== WEBSOCKET CONNECTED ===');
+                console.log('Frame:', frame);
                 
-                // Subscribe to general flag updates
-                stompClient.subscribe('/topic/flags', function (message) {
-                    displayMessage(JSON.parse(message.body));
-                });
-                
-                // Subscribe to system messages
-                stompClient.subscribe('/topic/system', function (message) {
-                    displayMessage(JSON.parse(message.body));
-                });
-                
-                // Subscribe to user-specific messages
-                stompClient.subscribe('/user/queue/messages', function (message) {
-                    displayMessage(JSON.parse(message.body));
-                });
-                
-                // Subscribe to subscription responses
-                stompClient.subscribe('/user/queue/subscription', function (message) {
-                    displayMessage(JSON.parse(message.body));
-                });
-                
-                // Subscribe to pong responses
-                stompClient.subscribe('/user/queue/pong', function (message) {
-                    displayMessage(JSON.parse(message.body));
-                });
+                // Subscribe to all entity types
+                subscribeToAllTopics();
                 
                 document.getElementById('connectBtn').disabled = true;
                 document.getElementById('disconnectBtn').disabled = false;
@@ -163,52 +245,124 @@
             }, function (error) {
                 connected = false;
                 updateStatus('disconnected', 'Connection failed: ' + error);
+                console.error('=== WEBSOCKET CONNECTION FAILED ===', error);
                 document.getElementById('connectBtn').disabled = false;
                 document.getElementById('disconnectBtn').disabled = true;
             });
         }
         
+        function subscribeToAllTopics() {
+            // Subscribe to all flag updates
+            subscriptions.push(stompClient.subscribe('/topic/flags', function (message) {
+                console.log('=== RECEIVED FLAG MESSAGE ===');
+                console.log('Raw message:', message);
+                console.log('Message body:', message.body);
+                const parsedMessage = JSON.parse(message.body);
+                console.log('Parsed message:', parsedMessage);
+                displayMessage(parsedMessage);
+            }));
+            
+            // Subscribe to all segment updates
+            subscriptions.push(stompClient.subscribe('/topic/segments', function (message) {
+                console.log('=== RECEIVED SEGMENT MESSAGE ===');
+                console.log('Raw message:', message);
+                console.log('Message body:', message.body);
+                const parsedMessage = JSON.parse(message.body);
+                console.log('Parsed message:', parsedMessage);
+                displayMessage(parsedMessage);
+            }));
+            
+            // Subscribe to all constraint updates
+            subscriptions.push(stompClient.subscribe('/topic/constraints', function (message) {
+                console.log('=== RECEIVED CONSTRAINT MESSAGE ===');
+                console.log('Raw message:', message);
+                console.log('Message body:', message.body);
+                const parsedMessage = JSON.parse(message.body);
+                console.log('Parsed message:', parsedMessage);
+                displayMessage(parsedMessage);
+            }));
+            
+            console.log('=== SUBSCRIBED TO ALL TOPICS ===');
+            addMessage('System', 'Subscribed to flags, segments, and constraints updates', 'connection_status');
+        }
+
+        function subscribeToNamespace() {
+            const namespace = document.getElementById('namespaceSelect').value;
+            if (!namespace || !connected) return;
+
+            // Subscribe to namespace-specific topics
+            subscriptions.push(stompClient.subscribe(`/topic/flags/${namespace}`, function (message) {
+                console.log(`=== RECEIVED FLAG MESSAGE FOR ${namespace} ===`);
+                const parsedMessage = JSON.parse(message.body);
+                displayMessage(parsedMessage);
+            }));
+
+            subscriptions.push(stompClient.subscribe(`/topic/segments/${namespace}`, function (message) {
+                console.log(`=== RECEIVED SEGMENT MESSAGE FOR ${namespace} ===`);
+                const parsedMessage = JSON.parse(message.body);
+                displayMessage(parsedMessage);
+            }));
+
+            subscriptions.push(stompClient.subscribe(`/topic/constraints/${namespace}`, function (message) {
+                console.log(`=== RECEIVED CONSTRAINT MESSAGE FOR ${namespace} ===`);
+                const parsedMessage = JSON.parse(message.body);
+                displayMessage(parsedMessage);
+            }));
+
+            addMessage('System', `Subscribed to ${namespace} namespace updates`, 'connection_status');
+        }
+
         function disconnect() {
             if (stompClient !== null) {
+                // Unsubscribe from all topics
+                subscriptions.forEach(sub => sub.unsubscribe());
+                subscriptions = [];
+
                 stompClient.disconnect();
                 connected = false;
                 updateStatus('disconnected', 'Disconnected');
                 document.getElementById('connectBtn').disabled = false;
                 document.getElementById('disconnectBtn').disabled = true;
                 addMessage('System', 'Disconnected from WebSocket server', 'connection_status');
+                console.log('=== WEBSOCKET DISCONNECTED ===');
             }
         }
-        
-        function subscribeToNamespace() {
-            if (!connected) {
-                alert('Please connect first');
-                return;
-            }
-            
-            const namespace = document.getElementById('namespaceSelect').value;
-            const payload = namespace ? { namespace: namespace } : {};
-            
-            stompClient.send("/app/subscribe", {}, JSON.stringify(payload));
+
+        function updateStatus(status, message) {
+            const statusElement = document.getElementById('status');
+            statusElement.className = `status ${status}`;
+            statusElement.textContent = message;
         }
-        
-        function updateStatus(className, text) {
-            const statusDiv = document.getElementById('status');
-            statusDiv.className = 'status ' + className;
-            statusDiv.textContent = text;
-        }
-        
+
         function displayMessage(message) {
+            console.log('=== DISPLAYING MESSAGE ===');
+            console.log('Message object:', message);
+            console.log('Message type:', message.type);
+
             const type = message.type || 'unknown';
             const content = formatMessage(message);
             addMessage(type, content, type);
         }
-        
+
         function formatMessage(message) {
             let content = '';
-            
+
+            console.log('=== FORMATTING MESSAGE ===');
+            console.log('Message type:', message.type);
+            console.log('Message data:', message.data);
+
             switch (message.type) {
-                case 'flag_update':
-                    content = `Flag Update: ${message.action} - Namespace: ${message.namespace}, Flag: ${message.flagKey}, Enabled: ${message.enabled}`;
+                case 'flag.update':
+                    const data = message.data || {};
+                    content = `Flag Update: ${data.action} - Namespace: ${data.namespace}, Flag: ${data.flag_key}, Enabled: ${data.enabled}`;
+                    break;
+                case 'segment.update':
+                    const segmentData = message.data || {};
+                    content = `Segment Update: ${segmentData.action} - Namespace: ${segmentData.namespace}, Segment: ${segmentData.segment_key}`;
+                    break;
+                case 'constraint.update':
+                    const constraintData = message.data || {};
+                    content = `Constraint Update: ${constraintData.action} - Namespace: ${constraintData.namespace}, Constraint: ${constraintData.constraint_id}, Segment: ${constraintData.segment_key}`;
                     break;
                 case 'connection_status':
                     content = `Status: ${message.message}`;
@@ -219,33 +373,35 @@
                 default:
                     content = JSON.stringify(message, null, 2);
             }
-            
+
             return content;
         }
-        
+
         function addMessage(type, content, messageType) {
             const messageLog = document.getElementById('messageLog');
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message ' + messageType;
-            
+
             const timestamp = new Date().toLocaleTimeString();
             messageDiv.innerHTML = `
                 <div class="timestamp">${timestamp}</div>
                 <strong>${type}:</strong> ${content}
             `;
-            
+
             messageLog.appendChild(messageDiv);
             messageLog.scrollTop = messageLog.scrollHeight;
         }
-        
+
         function clearMessages() {
             document.getElementById('messageLog').innerHTML = '';
         }
-        
+
         // Auto-connect on page load
         window.onload = function() {
+            console.log('=== PAGE LOADED ===');
+            console.log('Auto-connecting to WebSocket in 1 second...');
             setTimeout(connect, 1000);
         };
     </script>
 </body>
-</html> 
+</html>
