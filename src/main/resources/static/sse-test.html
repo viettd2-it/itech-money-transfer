@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flipt SSE Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.connecting {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        .namespace-selector {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-left: auto;
+        }
+        
+        select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .message-log {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            height: 400px;
+            overflow-y: auto;
+            padding: 10px;
+            background-color: #f8f9fa;
+        }
+        
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .message.flag\.update {
+            border-left-color: #28a745;
+            background-color: #d4edda;
+        }
+        
+        .message.segment\.update {
+            border-left-color: #ffc107;
+            background-color: #fff3cd;
+        }
+        
+        .message.constraint\.update {
+            border-left-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        
+        .message.connection {
+            border-left-color: #17a2b8;
+            background-color: #d1ecf1;
+        }
+        
+        .message.error {
+            border-left-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        
+        .timestamp {
+            color: #6c757d;
+            font-size: 0.8em;
+            margin-bottom: 4px;
+        }
+        
+        .debug-info {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+        }
+        
+        .debug-info h4 {
+            margin-top: 0;
+            color: #495057;
+        }
+        
+        .debug-info p {
+            margin: 5px 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📡 Flipt Server-Sent Events Test</h1>
+        
+        <div id="status" class="status disconnected">Disconnected</div>
+        
+        <div class="controls">
+            <button id="connectBtn" class="btn-primary" onclick="connect()">Connect</button>
+            <button id="disconnectBtn" class="btn-danger" onclick="disconnect()" disabled>Disconnect</button>
+            <button class="btn-secondary" onclick="clearMessages()">Clear Messages</button>
+            
+            <div class="namespace-selector">
+                <label for="namespaceSelect">Connect to namespace:</label>
+                <select id="namespaceSelect">
+                    <option value="">All namespaces</option>
+                    <option value="bep">BEP</option>
+                    <option value="rdb">RDB</option>
+                    <option value="default">Default</option>
+                </select>
+                <button class="btn-primary" onclick="connectToNamespace()">Connect to Namespace</button>
+            </div>
+        </div>
+        
+        <div>
+            <h3>📨 Real-Time Message Log</h3>
+            <div id="messageLog" class="message-log"></div>
+        </div>
+        
+        <div class="debug-info">
+            <h4>🔧 Debug Information</h4>
+            <p><strong>SSE Endpoints:</strong></p>
+            <ul>
+                <li>/api/sse/subscribe (All updates)</li>
+                <li>/api/sse/subscribe/{namespace} (Namespace-specific)</li>
+                <li>/api/sse/stats (Connection statistics)</li>
+            </ul>
+            <p><strong>Expected Event Types:</strong> flag.update, segment.update, constraint.update</p>
+            <p><strong>Console:</strong> Open browser developer tools (F12) to see detailed debug logs</p>
+            <p><strong>Advantages of SSE:</strong> Simpler than WebSocket, automatic reconnection, HTTP-based</p>
+        </div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let namespaceEventSource = null;
+        let connected = false;
+        
+        function connect() {
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            updateStatus('connecting', 'Connecting to SSE...');
+            
+            eventSource = new EventSource('/api/sse/subscribe');
+            
+            eventSource.onopen = function(event) {
+                connected = true;
+                updateStatus('connected', 'Connected to SSE');
+                console.log('=== SSE CONNECTED ===');
+                console.log('Event:', event);
+                
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+                
+                addMessage('System', 'Connected to Server-Sent Events', 'connection');
+            };
+            
+            eventSource.onerror = function(event) {
+                console.error('=== SSE CONNECTION ERROR ===', event);
+                if (eventSource.readyState === EventSource.CLOSED) {
+                    connected = false;
+                    updateStatus('disconnected', 'SSE connection closed');
+                    document.getElementById('connectBtn').disabled = false;
+                    document.getElementById('disconnectBtn').disabled = true;
+                    addMessage('System', 'SSE connection lost', 'error');
+                } else {
+                    updateStatus('connecting', 'SSE reconnecting...');
+                    addMessage('System', 'SSE reconnecting...', 'connection');
+                }
+            };
+            
+            // Listen for all event types
+            eventSource.addEventListener('flag.update', function(event) {
+                console.log('=== RECEIVED FLAG SSE MESSAGE ===');
+                console.log('Event data:', event.data);
+                const message = JSON.parse(event.data);
+                displayMessage(message);
+            });
+            
+            eventSource.addEventListener('segment.update', function(event) {
+                console.log('=== RECEIVED SEGMENT SSE MESSAGE ===');
+                console.log('Event data:', event.data);
+                const message = JSON.parse(event.data);
+                displayMessage(message);
+            });
+            
+            eventSource.addEventListener('constraint.update', function(event) {
+                console.log('=== RECEIVED CONSTRAINT SSE MESSAGE ===');
+                console.log('Event data:', event.data);
+                const message = JSON.parse(event.data);
+                displayMessage(message);
+            });
+            
+            eventSource.addEventListener('connection', function(event) {
+                console.log('=== RECEIVED CONNECTION SSE MESSAGE ===');
+                console.log('Event data:', event.data);
+                const message = JSON.parse(event.data);
+                addMessage('System', message.message || 'Connection event', 'connection');
+            });
+            
+            eventSource.addEventListener('status', function(event) {
+                console.log('=== RECEIVED STATUS SSE MESSAGE ===');
+                console.log('Event data:', event.data);
+                const message = JSON.parse(event.data);
+                addMessage('Status', message.message || 'Status update', 'connection');
+            });
+        }
+        
+        function connectToNamespace() {
+            const namespace = document.getElementById('namespaceSelect').value;
+            if (!namespace) {
+                alert('Please select a namespace');
+                return;
+            }
+            
+            if (namespaceEventSource) {
+                namespaceEventSource.close();
+            }
+            
+            namespaceEventSource = new EventSource(`/api/sse/subscribe/${namespace}`);
+            
+            namespaceEventSource.onopen = function(event) {
+                console.log(`=== SSE CONNECTED TO NAMESPACE: ${namespace} ===`);
+                addMessage('System', `Connected to ${namespace} namespace updates`, 'connection');
+            };
+            
+            namespaceEventSource.addEventListener('flag.update', function(event) {
+                console.log(`=== RECEIVED FLAG SSE MESSAGE FOR ${namespace} ===`);
+                const message = JSON.parse(event.data);
+                displayMessage(message, `[${namespace}] `);
+            });
+            
+            namespaceEventSource.addEventListener('segment.update', function(event) {
+                console.log(`=== RECEIVED SEGMENT SSE MESSAGE FOR ${namespace} ===`);
+                const message = JSON.parse(event.data);
+                displayMessage(message, `[${namespace}] `);
+            });
+            
+            namespaceEventSource.addEventListener('constraint.update', function(event) {
+                console.log(`=== RECEIVED CONSTRAINT SSE MESSAGE FOR ${namespace} ===`);
+                const message = JSON.parse(event.data);
+                displayMessage(message, `[${namespace}] `);
+            });
+        }
+        
+        function disconnect() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            if (namespaceEventSource) {
+                namespaceEventSource.close();
+                namespaceEventSource = null;
+            }
+            
+            connected = false;
+            updateStatus('disconnected', 'Disconnected from SSE');
+            document.getElementById('connectBtn').disabled = false;
+            document.getElementById('disconnectBtn').disabled = true;
+            addMessage('System', 'Disconnected from Server-Sent Events', 'connection');
+            console.log('=== SSE DISCONNECTED ===');
+        }
+        
+        function updateStatus(status, message) {
+            const statusElement = document.getElementById('status');
+            statusElement.className = `status ${status}`;
+            statusElement.textContent = message;
+        }
+        
+        function displayMessage(message, prefix = '') {
+            console.log('=== DISPLAYING SSE MESSAGE ===');
+            console.log('Message object:', message);
+            console.log('Message type:', message.type);
+            
+            const type = message.type || 'unknown';
+            const content = formatMessage(message);
+            addMessage(prefix + type, content, type);
+        }
+        
+        function formatMessage(message) {
+            let content = '';
+            
+            console.log('=== FORMATTING SSE MESSAGE ===');
+            console.log('Message type:', message.type);
+            console.log('Message data:', message.data);
+            
+            switch (message.type) {
+                case 'flag.update':
+                    const data = message.data || {};
+                    content = `Flag Update: ${data.action} - Namespace: ${data.namespace}, Flag: ${data.flag_key}, Enabled: ${data.enabled}`;
+                    break;
+                case 'segment.update':
+                    const segmentData = message.data || {};
+                    content = `Segment Update: ${segmentData.action} - Namespace: ${segmentData.namespace}, Segment: ${segmentData.segment_key}`;
+                    break;
+                case 'constraint.update':
+                    const constraintData = message.data || {};
+                    content = `Constraint Update: ${constraintData.action} - Namespace: ${constraintData.namespace}, Constraint: ${constraintData.constraint_id}, Segment: ${constraintData.segment_key}`;
+                    break;
+                case 'connection_status':
+                    content = `Status: ${message.message}`;
+                    break;
+                case 'error':
+                    content = `Error: ${message.message}`;
+                    break;
+                default:
+                    content = JSON.stringify(message, null, 2);
+            }
+            
+            return content;
+        }
+        
+        function addMessage(type, content, messageType) {
+            const messageLog = document.getElementById('messageLog');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ' + messageType;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            messageDiv.innerHTML = `
+                <div class="timestamp">${timestamp}</div>
+                <strong>${type}:</strong> ${content}
+            `;
+            
+            messageLog.appendChild(messageDiv);
+            messageLog.scrollTop = messageLog.scrollHeight;
+        }
+        
+        function clearMessages() {
+            document.getElementById('messageLog').innerHTML = '';
+        }
+        
+        // Auto-connect on page load
+        window.onload = function() {
+            console.log('=== SSE PAGE LOADED ===');
+            console.log('Auto-connecting to SSE in 1 second...');
+            setTimeout(connect, 1000);
+        };
+    </script>
+</body>
+</html>

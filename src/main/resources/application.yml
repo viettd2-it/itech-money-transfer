@@ -18,6 +18,9 @@ redis:
 websocket:
   enabled: true
 
+sse:
+  enabled: true
+
 server:
   port: 8282
 

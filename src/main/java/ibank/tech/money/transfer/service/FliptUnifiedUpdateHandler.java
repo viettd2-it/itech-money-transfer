@@ -21,7 +21,7 @@ public class FliptUnifiedUpdateHandler {
     private final FliptFlagProcessor flagProcessor;
     private final FliptSegmentProcessor segmentProcessor;
     private final FliptConstraintProcessor constraintProcessor;
-    private final WebSocketBroadcastService webSocketBroadcastService;
+    private final SseBroadcastService sseBroadcastService;
 
     public void handleMessage(String message) {
         try {
@@ -59,13 +59,13 @@ public class FliptUnifiedUpdateHandler {
                 default:
                     log.warn("Unknown entity type: {}", event.getType());
             }
-            // Broadcast flag update to WebSocket clients
-            log.info("=== ATTEMPTING WEBSOCKET BROADCAST ===");
+            // Broadcast update to SSE clients
+            log.info("=== ATTEMPTING SSE BROADCAST ===");
             try {
-                webSocketBroadcastService.broadcastUpdate(event);
-                log.info("=== WEBSOCKET BROADCAST COMPLETED ===");
+                sseBroadcastService.broadcastUpdate(event);
+                log.info("=== SSE BROADCAST COMPLETED ===");
             } catch (Exception e) {
-                log.error("Failed to broadcast flag update via WebSocket", e);
+                log.error("Failed to broadcast update via SSE", e);
             }
         } catch (Exception e) {
             log.error("Error processing Flipt update message: {}", message, e);
